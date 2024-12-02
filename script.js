@@ -1,4 +1,4 @@
-//(() => {
+(() => {
     const q = (varFn) => {
         try {
             return varFn?.();
