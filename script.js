@@ -41,6 +41,7 @@ if (!globalThis.XMLHttpRequest?.prototype?.['&open']) {
             return this['&open'](...arguments);
         } catch (e) {
             console.warn(e, this, ...arguments);
+            this.error = e;
             return e;
         }
     }));
@@ -54,21 +55,27 @@ if (!globalThis.XMLHttpRequest?.prototype?.['&send']) {
             }
             return this['&send'](...arguments);
         } catch (e) {
-            this.readyState ??= 0;
+            objDefEnum(this, 'readyState', this.readyState ??= 0);
             while (this.readyState < 3) {
-                this.readyState++;
+                objDefEnum(this, 'readyState',++this.readyState);
                 this.dispatchEvent(new Event('readystatechange'));
             }
 
             this.readyState = 4;
+            objDefEnum(this, 'readyState', 4);
             this.status = 500;
+            objDefEnum(this, 'status', 500)
             this.statusText = e.message;
-            this.responseText = Object.getOwnPropertyNames(e).map(x => `${x}: ${e[x]}`).join('\n');;
+            objDefEnum(this, 'statusText', e.message);
+            const resText = Object.getOwnPropertyNames(e).map(x => `${x}: ${e[x]}`).join('\n');
+            this.responseText = resText;
+            objDefEnum(this, 'responseText', resText);
             this.dispatchEvent(new Event('readystatechange'));
             this.dispatchEvent(new Event('loadstart'));
             this.dispatchEvent(new Event('load'));
             this.dispatchEvent(new Event('loadend'));
             console.warn(e, this, ...arguments);
+            this.error = e;
             return e;
         }
     }));
@@ -97,6 +104,7 @@ if (!globalThis.XMLHttpRequest?.prototype?.['&abort']) {
             return this['&abort'](...arguments);
         } catch (e) {
             console.warn(e, this, ...arguments);
+            this.error = e;
             return e;
         }
     }));
