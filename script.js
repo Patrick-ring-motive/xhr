@@ -34,7 +34,7 @@
     function stealth(shadow, original) {
         shadow = Object(shadow);
         original = Object(original);
-        objDefProp(shadow, 'toString', function toString(){return original.toString();});
+        objDefProp(shadow, 'toString', function toString() { return original.toString(); });
         Object.setPrototypeOf(shadow, original);
         return shadow;
     }
