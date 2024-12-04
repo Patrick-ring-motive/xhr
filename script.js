@@ -39,17 +39,16 @@
         return shadow;
     }
 
-    function intercede(root, name, fn) {
+    function intercede(root, name, key, fn) {
         root = Object(root);
         name = String(name);
         fn = Object(fn);
-        const key = Symbol(name);
         objDefProp(root, key, root?.[name]);
         objDefEnum(root, name, fn);
         stealth(root?.[name], root?.[key]);
     }
-
-    intercede(globalThis.XMLHttpRequest?.prototype, 'open', function open(method, url, asynch, user, password) {
+    const openKey = Symbol('open');
+    intercede(globalThis.XMLHttpRequest?.prototype, 'open', openKey, function open(method, url, asynch, user, password) {
         try {
             this.requestMethod = method;
             this.requestURL = url;
@@ -62,8 +61,8 @@
             return e;
         }
     });
-
-    intercede(XMLHttpRequest.prototype, 'send', function send() {
+    const sendKey = Symbol('send');
+    intercede(XMLHttpRequest.prototype, 'send', sendKey, function send() {
         try {
             if (`${this.requestURL}`.includes('googlead')) {
                 return console.warn(this, ...arguments);
@@ -78,11 +77,11 @@
     });
 
 
-
-    intercede(XMLHttpRequest.prototype, 'setRequestHeader', function setRequestHeader(header, value) {
+    const setRequestHeaderKey = Symbol('setRequestHeader');
+    intercede(XMLHttpRequest.prototype, 'setRequestHeader', setRequestHeaderKey, function setRequestHeader(header, value) {
         this.requestHeaders ??= new Map();
         try {
-            this['&setRequestHeader'](header, value);
+            this[setRequestHeaderKey](header, value);
             if (this.requestHeaders.get(header)) {
                 this.requestHeaders.set(header, this.requestHeaders.get(header) + ', ' + value);
             } else {
@@ -93,34 +92,38 @@
             this.requestHeaders.set(header, e);
         }
     });
-    intercede(XMLHttpRequest.prototype, 'abort', function abort() {
+    const abortKey = Symbol('abort');
+    intercede(XMLHttpRequest.prototype, 'abort', abortKey, function abort() {
         try {
-            return this['&abort'](...arguments);
+            return this[abortKey](...arguments);
         } catch (e) {
             console.warn(e, this, ...arguments);
             this.error = e;
             return e;
         }
     });
-    intercede(XMLHttpRequest.prototype, 'getAllResponseHeaders', function getAllResponseHeaders() {
+    const getAllResponseHeadersKey = Symbol('getAllResponseHeaders');
+    intercede(XMLHttpRequest.prototype, 'getAllResponseHeaders', getAllResponseHeadersKey, function getAllResponseHeaders() {
         try {
-            return this['&getAllResponseHeaders'](...arguments);
+            return this[getAllResponseHeadersKey](...arguments);
         } catch (e) {
             console.warn(e, this, ...arguments);
             return Object.getOwnPropertyNames(e).map(x => `${x}: ${e[x]}`).join('\n');
         }
     });
-    intercede(XMLHttpRequest.prototype, 'getResponseHeader', function getResponseHeader() {
+    const getResponseHeaderKey = Symbol('getResponseHeader');
+    intercede(XMLHttpRequest.prototype, 'getResponseHeader', getResponseHeaderKey, function getResponseHeader() {
         try {
-            return this['&getResponseHeader'](...arguments);
+            return this[getResponseHeaderKey](...arguments);
         } catch (e) {
             console.warn(e, this, ...arguments);
             return e.message;
         }
     });
-    intercede(XMLHttpRequest.prototype, 'overrideMimeType', function overrideMimeType() {
+    const overrideMimeTypeKey = Symbol('overrideMimeType');
+    intercede(XMLHttpRequest.prototype, 'overrideMimeType', overrideMimeTypeKey, function overrideMimeType() {
         try {
-            return this['&overrideMimeType'](...arguments);
+            return this[overrideMimeTypeKey](...arguments);
         } catch (e) {
             console.warn(e, this, ...arguments);
             return e;
