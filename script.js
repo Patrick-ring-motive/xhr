@@ -17,7 +17,7 @@
         const fn = args?.shift?.();
         return fn && new fn(...args);
     };
-})();
+
 globalThis.objDoProp = function(obj, prop, def, enm, mut) {
     return Object.defineProperty(obj, prop, {
         value: def,
@@ -30,30 +30,40 @@ globalThis.objDefProp = (obj, prop, def) => objDoProp(obj, prop, def, false, tru
 globalThis.objDefEnum = (obj, prop, def) => objDoProp(obj, prop, def, true, true);
 globalThis.objFrzProp = (obj, prop, def) => objDoProp(obj, prop, def, false, false);
 globalThis.objFrzEnum = (obj, prop, def) => objDoProp(obj, prop, def, true, false);
-if (!globalThis.XMLHttpRequest?.prototype?.['&open']) {
-    objDefProp(globalThis.XMLHttpRequest?.prototype ?? {}, '&open', globalThis.XMLHttpRequest?.prototype?.open);
+
+    function stealth(shadow,original){
+        shadow = Object(shadow);
+        original = Object.(original);
+    Object.defineProperties(shadow, Object.getOwnPropertyDescriptors(original));
+    Object.setPrototypeOf(shadow, original);
+        return shadow;
+    }
+
+const openKey = Symbol('open');
+    objDefProp(globalThis.XMLHttpRequest?.prototype ?? {}, openKey, globalThis.XMLHttpRequest?.prototype?.open);
     objDefEnum(globalThis.XMLHttpRequest?.prototype ?? {}, 'open', (function open(method, url, asynch, user, password) {
         try {
             this.requestMethod = method;
             this.requestURL = url;
             this.requestAsync = asynch;
             this.requestHeaders ??= new Map();
-            return this['&open'](...arguments);
+            return this[openKey](...arguments);
         } catch (e) {
             console.warn(e, this, ...arguments);
             this.error = e;
             return e;
         }
     }));
-};
-if (!globalThis.XMLHttpRequest?.prototype?.['&send']) {
-    objDefProp(XMLHttpRequest.prototype, '&send', XMLHttpRequest.prototype.send);
+stealth(globalThis.XMLHttpRequest?.prototype?.open, globalThis.XMLHttpRequest?.prototype?.[openKey]);
+    
+const sendKey = Symbol('send');
+    objDefProp(XMLHttpRequest.prototype, sendKey, XMLHttpRequest.prototype.send);
     objDefEnum(XMLHttpRequest.prototype, 'send', (function send() {
         try {
             if (`${this.requestURL}`.includes('googlead')) {
                 return console.warn(this, ...arguments);
             }
-            return this['&send'](...arguments);
+            return this[sendKey](...arguments);
         } catch (e) {
             this?.finish?.(e);
             console.warn(e, this, ...arguments);
@@ -61,7 +71,9 @@ if (!globalThis.XMLHttpRequest?.prototype?.['&send']) {
             return e;
         }
     }));
-};
+    stealth(globalThis.XMLHttpRequest?.prototype?.send, globalThis.XMLHttpRequest?.prototype?.[sendKey]);
+
+    
 if (!globalThis.XMLHttpRequest?.prototype?.['&setRequestHeader']) {
     objDefProp((globalThis.XMLHttpRequest?.prototype ?? {}), '&setRequestHeader', globalThis.XMLHttpRequest?.prototype?.setRequestHeader);
     objDefEnum((globalThis.XMLHttpRequest?.prototype ?? {}), 'setRequestHeader', (function setRequestHeader(header, value) {
@@ -148,3 +160,6 @@ if (!globalThis.XMLHttpRequest?.prototype?.['&overrideMimeType']) {
         this.dispatchEvent(new Event('loadend'));
         this.error = e;
 });
+
+    })();
+    
