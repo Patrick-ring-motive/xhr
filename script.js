@@ -47,13 +47,29 @@
         objDefEnum(root, name, fn);
         stealth(root?.[name], root?.[key]);
     }
+
+    const serializer = newQ(globalThis.XMLSerializer);
+    const serializeXML = node => serializer?.serializeToString?.(node);
+    const bytes = buff => new Uint8Array(buff);
+    const encoder = newQ(globalThis.TextEncoder);
+    const encode = str => encoder?.encode?.(str) ?? bytes([...str].map(x => x.charCodeAt()));
+    const buffer = str => encode(str).buffer;
+    const decoder = newQ(globalThis.TextDecoder);
+    const decode = byte => decoder?.decode?.(byte) ?? String.fromCharCode(...byte);
+    const text = buff => decode(bytes(buff));
+    
+    if(!globalThis?.namespaces?.['xhr-intercede']){
     const openKey = Symbol('open');
     intercede(globalThis.XMLHttpRequest?.prototype, 'open', openKey, function open(method, url, asynch, user, password) {
         try {
-            this.requestMethod = method;
-            this.requestURL = url;
-            this.requestAsync = asynch;
-            this.requestHeaders ??= new Map();
+            objDefProp(this,'&request',{
+                method : String(method || 'GET').toUpperCase(), 
+                url : String(url),
+                async : asynch,
+                user : user,
+                password : password,
+                headers : new Map()
+            });
             return this[openKey](...arguments);
         } catch (e) {
             console.warn(e, this, ...arguments);
@@ -67,6 +83,9 @@
             if (`${this.requestURL}`.includes('googlead')) {
                 return console.warn(this, ...arguments);
             }
+            if(arguments[0]){
+                (this?.['&request']??{}).body = arguments[0];
+            }
             return this[sendKey](...arguments);
         } catch (e) {
             this?.finish?.(e);
@@ -79,17 +98,16 @@
 
     const setRequestHeaderKey = Symbol('setRequestHeader');
     intercede(XMLHttpRequest.prototype, 'setRequestHeader', setRequestHeaderKey, function setRequestHeader(header, value) {
-        this.requestHeaders ??= new Map();
         try {
             this[setRequestHeaderKey](header, value);
-            if (this.requestHeaders.get(header)) {
-                this.requestHeaders.set(header, this.requestHeaders.get(header) + ', ' + value);
+            if (this?.['&request']?.headers?.get?.(header)) {
+                    this?.['&request']?.headers?.set?.(header, this?.['&request']?.headers?.get?.(header) + ', ' + value);
             } else {
-                this.requestHeaders.set(header, value);
+                    this?.['&request']?.headers?.set?.(header, value);
             }
         } catch (e) {
             console.warn(e, this, ...arguments);
-            this.requestHeaders.set(header, e);
+                this?.['&request']?.headers?.set?.(header, e);
         }
     });
     const abortKey = Symbol('abort');
@@ -153,5 +171,8 @@
         this.dispatchEvent(new Event('loadend'));
         this.error = e;
     });
+globalThis.namespaces ??= {};
+globalThis.namespaces['xhr-intercede'] ||= Object(true);
+}
 
 })();
