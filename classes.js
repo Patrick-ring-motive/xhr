@@ -81,6 +81,8 @@
     const decoder = newQ(globalThis.TextDecoder);
     const decode = byte => decoder?.decode?.(byte) ?? String.fromCharCode(...byte);
     const text = buff => decode(bytes(buff));
+    const parser = new DOMParser();
+    const textDoc = x => parser.parseFromString(x, 'text/html');
     function docText(doc) {
         try {
             return new XMLSerializer().serializeToString(doc);
@@ -121,22 +123,31 @@
                         'mozSystem',
                         'readyState',
                         'response',
-                        'responseText',
                         'responseType',
                         'responseURL',
-                        'responseXML',
                         'status',
                         'statusText',
                         'timeout',
                         'upload',
-                        'withCredentials'
+                        'withCredentials',
+                        'onreadystatechange'
                     ]) {
                         Object.defineProperty($this, x, {
                             get() {
-                                return $xhr[x];
+                                try {
+                                    return $xhr[x];
+                                } catch (e) {
+                                    console.warn(e, this, ...arguments);
+                                    return e;
+                                }
                             },
                             set(val) {
-                                $xhr[x] = val;
+                                try {
+                                    $xhr[x] = val;
+                                } catch (e) {
+                                    console.warn(e, this, ...arguments);
+                                    return e;
+                                }
                             },
                             enumerable: true,
                             configurable: true,
@@ -144,19 +155,72 @@
                     }
                     Object.defineProperty($this, 'responseText', {
                         get() {
-                            return $xhr['responseText'];
+                            try {
+                                if ($xhr.responseType == 'document') {
+                                    return docText($xhr.response);
+                                }
+                                if (typeof $xhr.response == 'arrayBuffer') {
+                                    return text($xhr.response);
+                                }
+                                if (typeof $xhr.response == 'json') {
+                                    return JSON.stringify($xhr.response);
+                                }
+                                if (typeof $xhr.response == 'blob') {
+                                    return $xhr.response.text();
+                                }
+                                return $xhr.responseText || $xhr.statusText;
+                            } catch (e) {
+                                console.warn(e, this, ...arguments);
+                                return e.message;
+                            }
                         },
                         set(val) {
-                            try{
-                                
+                            try {
                                 $xhr['responseText'] = val;
-                            }catch(e){
-                                console.warn(e,this,...arguments);
+                            } catch (e) {
+                                console.warn(e, this, ...arguments);
                                 return e.message;
                             }
                         },
                         enumerable: true,
                         configurable: true,
+                    });
+                    Object.defineProperty($this, 'responseXML', {
+                        get() {
+                            try {
+                                if ($xhr.responseType == 'document') {
+                                    return $xhr.responseXML || $xhr.response || textDoc($xhr.statusText);
+                                }
+                                if (typeof $xhr.response == 'arrayBuffer') {
+                                    return textDoc(text($xhr.response));
+                                }
+                                if (typeof $xhr.response == 'json') {
+                                    return textDoc(JSON.stringify($xhr.response));
+                                }
+                                if (typeof $xhr.response == 'blob') {
+                                    return async () => textDoc(await $xhr.response.text());
+                                }
+                                return textDoc($xhr.responseText || $xhr.statusText);
+                            } catch (e) {
+                                console.warn(e, this, ...arguments);
+                                return textDoc(Object.getOwnPropertyNames(e).map(x => `${x}: ${e[x]}`).join('\n'));
+                            }
+                        },
+                        set(val) {
+                            try {
+                                $xhr['responseText'] = val;
+                            } catch (e) {
+                                console.warn(e, this, ...arguments);
+                                return e.message;
+                            }
+                        },
+                        enumerable: true,
+                        configurable: true,
+                    });
+                    objDefEnum($this, 'addEventListener', function addEventListener(...args) {
+                        const type = args?.shift?.();
+                        const listener = args?.shift?.();
+                        return $xhr.addEventListener(type, listener.bind($this), ...args);
                     });
                     objDefEnum($this, 'abort', function abort() { return $xhr.abort(...arguments); });
                     objDefEnum($this, 'getAllResponseHeaders', function getAllResponseHeaders() { return $xhr.getAllResponseHeaders(...arguments); });
@@ -166,11 +230,44 @@
                     objDefEnum($this, 'send', function send() { return $xhr.send(...arguments); });
                     objDefEnum($this, 'setAttributionReporting', function setAttributionReporting() { return $xhr.setAttributionReporting(...arguments); });
                     objDefEnum($this, 'setRequestHeader', function setRequestHeader() { return $xhr.setRequestHeader(...arguments); });
+                    objDefEnum($this, 'dispatchEvent', function dispatchEvent() { return $xhr.dispatchEvent(...arguments); });
+                    dispatchEvent
+                    for (let x of [
+                        'onabort',
+                        'onerror',
+                        'onload',
+                        'onloadend',
+                        'onloadstart',
+                        'onprogress',
+                        'ontimeout',
+                        'onerror'
+                    ]) {
+                        Object.defineProperty($this, x, {
+                            get() {
+                                try {
+                                    return $xhr[x];
+                                } catch (e) {
+                                    console.warn(e, this, ...arguments);
+                                    return e;
+                                }
+                            },
+                            set(val) {
+                                try {
+                                    $this.addEventListner(x, val);
+                                } catch (e) {
+                                    console.warn(e, this, ...arguments);
+                                    return e;
+                                }
+                            },
+                            enumerable: true,
+                            configurable: true,
+                        });
+                    }
                     Object.setPrototypeOf($this, globalThis[$XMLHttpRequest].prototype);
                 } catch (e) {
                     console.warn(e, $this, ...arguments);
                 }
-                return $this;
+                return Object.setPrototypeOf($this, $xhr);
             }
             assignProto(globalThis.XMLHttpRequest,
                 globalThis[$XMLHttpRequest]);
