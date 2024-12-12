@@ -80,6 +80,17 @@
     const buffer = str => encode(str).buffer;
     const decoder = newQ(globalThis.TextDecoder);
     const decode = byte => decoder?.decode?.(byte) ?? String.fromCharCode(...byte);
+    const zdecode = byte => {
+        try {
+            return decoder.decode(byte);
+        } catch {
+            try {
+                return String.fromCharCode(...byte);
+            } catch {
+                return String(bytes);
+            }
+        }
+    };
     const text = buff => decode(bytes(buff));
     const parser = new DOMParser();
     const textDoc = x => parser.parseFromString(x, 'text/html');
@@ -99,6 +110,49 @@
             globalThis[$XMLHttpResponse] = function XMLHttpResponse(xhr) {
                 const res = xhr?.response;
             }
+
+
+            ///////
+            const Streang = function Streang(stream) {
+                const $txt = [];
+                let $this;
+
+                if (new.target) {
+                    $this = this;
+                } else {
+                    $this = Object.create(null);
+                }
+                (async () => {
+                    if(stream instanceof Promise){
+                        stream = await stream;
+                    }
+                    for await (const chunk of stream) {
+                        try{
+                            $txt.push(zdecode(chunk));
+                        }catch(e){
+                            console.warn(e,chunk,stream);
+                            $txt.push(` ${e.message} `);
+                        }
+                    }
+                    objDefProp($this,'done',true);
+                })();
+
+                objDefProp($this, 'toString', function toString() { return $txt.join(''); });
+                objDefProp($this, 'valueOf', function valueOf() { return $txt.join(''); });
+                objDefProp($this, 'toLocaleString', function toLocaleString() { return $txt.join(''); });
+                objDefProp($this, Symbol.toPrimitive, function toPrimitive() { return $txt.join(''); });
+                objDefProp($this, Symbol.toStringTag, function toStringTag() { return $txt.join(''); });
+                Object.defineProperty($this, 'length', {
+                    get() {
+                        return $txt.join('').length;
+                    },
+                    set(val) { },
+                    enumerable: true,
+                    configurable: true,
+                });
+                Object.setPrototypeOf($this, String.prototype);
+            }
+            //////
             objDefProp(globalThis, $XMLHttpRequest, globalThis.XMLHttpRequest);
             globalThis.XMLHttpRequest = function XMLHttpRequest() {
                 const $xhr = new globalThis[$XMLHttpRequest](...arguments);
@@ -166,7 +220,7 @@
                                     return JSON.stringify($xhr.response);
                                 }
                                 if (typeof $xhr.response == 'blob') {
-                                    return $xhr.response.text();
+                                    return Streang($xhr.response.stream());
                                 }
                                 return $xhr.responseText || $xhr.statusText;
                             } catch (e) {
@@ -198,7 +252,7 @@
                                     return textDoc(JSON.stringify($xhr.response));
                                 }
                                 if (typeof $xhr.response == 'blob') {
-                                    return async () => textDoc(await $xhr.response.text());
+                                    return textDoc(Streang($xhr.response.stream()));
                                 }
                                 return textDoc($xhr.responseText || $xhr.statusText);
                             } catch (e) {
